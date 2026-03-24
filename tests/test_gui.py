@@ -144,6 +144,61 @@ def test_main_view_two_step_restore(qapp, qtbot):
     chip.click()                          # second click: restore
     assert 0 in v._restored_indices
 
+from app import _CancelledError
+
+def test_export_worker_emits_cancelled(qapp, qtbot, tmp_path):
+    segs = [{"start": 0.0, "end": 1.0}]
+    output = str(tmp_path / "out.mp4")
+    worker = ExportWorker("input.mp4", segs, output, use_gpu=False)
+    worker.request_cancel()  # flag set before start
+
+    def fake_cut(vp, segs, tmpdir, progress_cb=None):
+        if progress_cb:
+            progress_cb(1, len(segs))  # triggers _CancelledError
+        return []
+
+    with patch("app.cut_segments_cpu", side_effect=fake_cut):
+        with qtbot.waitSignal(worker.cancelled, timeout=5000):
+            worker.start()
+            worker.wait()
+
+def test_export_worker_cancel_deletes_output(qapp, qtbot, tmp_path):
+    segs = [{"start": 0.0, "end": 1.0}]
+    output = str(tmp_path / "out.mp4")
+    open(output, "w").close()  # pre-create partial output
+    worker = ExportWorker("input.mp4", segs, output, use_gpu=False)
+    worker.request_cancel()
+
+    def fake_cut(vp, segs, tmpdir, progress_cb=None):
+        if progress_cb:
+            progress_cb(1, len(segs))
+        return []
+
+    with patch("app.cut_segments_cpu", side_effect=fake_cut):
+        with qtbot.waitSignal(worker.cancelled, timeout=5000):
+            worker.start()
+            worker.wait()
+    assert not os.path.exists(output)
+
+def test_export_worker_cancel_does_not_emit_error(qapp, qtbot, tmp_path):
+    segs = [{"start": 0.0, "end": 1.0}]
+    output = str(tmp_path / "out.mp4")
+    worker = ExportWorker("input.mp4", segs, output, use_gpu=False)
+    worker.request_cancel()
+    errors = []
+    worker.error.connect(lambda m: errors.append(m))
+
+    def fake_cut(vp, segs, tmpdir, progress_cb=None):
+        if progress_cb:
+            progress_cb(1, len(segs))
+        return []
+
+    with patch("app.cut_segments_cpu", side_effect=fake_cut):
+        with qtbot.waitSignal(worker.cancelled, timeout=5000):
+            worker.start()
+            worker.wait()
+    assert errors == []
+
 from app import MainWindow, ImportView
 
 def test_main_window_shows_import_on_start(qapp, qtbot):

@@ -226,6 +226,10 @@ def concat_files(files, output_path, tmpdir):
     run([_ff_bin("ffmpeg"), "-y", "-f", "concat", "-safe", "0",
          "-i", list_file, "-c", "copy", output_path])
 
+class _CancelledError(Exception):
+    """Raised inside ExportWorker.run() to abort export cooperatively."""
+
+
 class AnalysisWorker(QThread):
     progress          = pyqtSignal(int, str)
     analysis_complete = pyqtSignal(list, np.ndarray, float)
@@ -292,6 +296,7 @@ class ExportWorker(QThread):
     progress        = pyqtSignal(int, str)
     export_complete = pyqtSignal(str)
     error           = pyqtSignal(str)
+    cancelled       = pyqtSignal()
 
     def __init__(self, video_path, segments, output_path, use_gpu, parent=None):
         super().__init__(parent)
@@ -299,12 +304,18 @@ class ExportWorker(QThread):
         self.segments    = segments
         self.output_path = output_path
         self.use_gpu     = use_gpu
+        self._cancel_requested = False
+
+    def request_cancel(self):
+        self._cancel_requested = True
 
     def run(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
                 start = time.monotonic()
                 def cb(done, total_segs):
+                    if self._cancel_requested:
+                        raise _CancelledError()
                     pct = int(done / total_segs * 90)
                     elapsed = time.monotonic() - start
                     if done > 0:
@@ -324,6 +335,10 @@ class ExportWorker(QThread):
                 concat_files(seg_files, self.output_path, tmpdir)
                 self.progress.emit(100, _("Done"))
                 self.export_complete.emit(self.output_path)
+            except _CancelledError:
+                if os.path.exists(self.output_path):
+                    os.remove(self.output_path)
+                self.cancelled.emit()
             except Exception as exc:
                 if os.path.exists(self.output_path):
                     os.remove(self.output_path)
