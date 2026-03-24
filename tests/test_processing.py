@@ -153,7 +153,7 @@ def test_read_audio_returns_tensor():
     assert t.shape == (4,)
     assert abs(t[0].item() - 0.1) < 1e-5
 
-from app import nvenc_available, cut_segments_gpu, cut_segments_cpu, concat_files
+from core.exporter import nvenc_available, cut_segments_gpu, cut_segments_cpu, concat_files
 
 def test_nvenc_available_true():
     mock = MagicMock(); mock.stdout = "h264_nvenc encoder"
