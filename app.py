@@ -164,6 +164,67 @@ def concat_files(files, output_path, tmpdir):
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0",
          "-i", list_file, "-c", "copy", output_path])
 
+class AnalysisWorker(QThread):
+    progress          = pyqtSignal(int, str)
+    analysis_complete = pyqtSignal(list, np.ndarray, float)
+    error             = pyqtSignal(str)
+
+    def __init__(self, video_path, parent=None):
+        super().__init__(parent)
+        self.video_path = video_path
+        self.cached_probs = []
+
+    def _extract_audio(self):
+        self.progress.emit(5, "Extracting audio…")
+        wav = read_audio_from_video(self.video_path)
+        return wav, len(wav) / SAMPLING_RATE
+
+    def _compute_probs(self, wav):
+        self.progress.emit(20, "Loading VAD model…")
+        model = load_silero_vad(onnx=True)
+        model.reset_states()
+        probs = []
+        n_frames = (len(wav) + FRAME_SIZE - 1) // FRAME_SIZE
+        for i in range(0, len(wav), FRAME_SIZE):
+            chunk = wav[i: i + FRAME_SIZE]
+            if len(chunk) < FRAME_SIZE:
+                chunk = F.pad(chunk, (0, FRAME_SIZE - len(chunk)))
+            with torch.no_grad():
+                probs.append(model(chunk, SAMPLING_RATE).item())
+            done = len(probs)
+            if done % 500 == 0:
+                pct = 20 + int(done / n_frames * 70)
+                self.progress.emit(pct, f"Detecting speech… {done}/{n_frames} frames")
+        return probs
+
+    @staticmethod
+    def _downsample_pcm(wav_tensor, n_bars=WAVEFORM_BARS):
+        arr = wav_tensor.numpy()
+        total = len(arr)
+        if total == 0:
+            return np.zeros(1, dtype=np.float32)
+        step = max(1, total // n_bars)
+        return np.array([
+            np.max(np.abs(arr[i: i+step]))
+            for i in range(0, total, step)
+        ], dtype=np.float32)[:n_bars]
+
+    def run(self):
+        try:
+            wav, duration = self._extract_audio()
+            probs = self._compute_probs(wav)
+            self.cached_probs = probs
+            self.progress.emit(92, "Computing segments…")
+            segs = probs_to_segments(probs, DEFAULT_THRESHOLD)
+            segs = merge_segments(segs, min_gap=DEFAULT_MIN_SILENCE)
+            segs = pad_segments(segs, pad=DEFAULT_PADDING, max_duration=duration)
+            pcm = self._downsample_pcm(wav)
+            self.progress.emit(100, "Done")
+            self.analysis_complete.emit(segs, pcm, duration)
+        except Exception as exc:
+            self.error.emit(str(exc))
+
+
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
