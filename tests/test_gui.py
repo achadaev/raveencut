@@ -89,3 +89,11 @@ def test_waveform_seek_signal(qapp, qtbot):
     with qtbot.waitSignal(w.seek_requested, timeout=1000) as blocker:
         QTest.mouseClick(w, Qt.MouseButton.LeftButton, pos=QPoint(400, 40))
     assert 0.0 <= blocker.args[0] <= 10.0
+
+from app import VideoPlayerWidget
+
+def test_video_player_widget_creates(qapp, qtbot):
+    w = VideoPlayerWidget()
+    qtbot.addWidget(w); w.show()
+    assert w._play_btn is not None
+    assert w._time_label is not None
