@@ -10,8 +10,9 @@ from PyQt6.QtWidgets import QApplication
 def qapp():
     return QApplication.instance() or QApplication(sys.argv)
 
-from app import (AnalysisWorker, SAMPLING_RATE, FRAME_SIZE,
-                 DEFAULT_THRESHOLD, DEFAULT_MIN_SILENCE, DEFAULT_PADDING)
+from ui.workers import AnalysisWorker
+from core.constants import (SAMPLING_RATE, FRAME_SIZE,
+                             DEFAULT_THRESHOLD, DEFAULT_MIN_SILENCE, DEFAULT_PADDING)
 
 from ui.waveform import WaveformWidget
 from ui.video_player import VideoPlayerWidget
@@ -44,7 +45,7 @@ def test_analysis_worker_emits_error_on_bad_file(qapp, qtbot):
         worker.wait()
     assert len(blocker.args[0]) > 0
 
-from app import ExportWorker
+from ui.workers import ExportWorker
 
 def test_export_worker_emits_complete(qapp, qtbot, tmp_path):
     from unittest.mock import patch
@@ -59,8 +60,8 @@ def test_export_worker_emits_complete(qapp, qtbot, tmp_path):
     def fake_concat(files, out, tmpdir):
         open(out, "w").close()
 
-    with patch("app.cut_segments_cpu", side_effect=fake_cut), \
-         patch("app.concat_files", side_effect=fake_concat):
+    with patch("ui.workers.cut_segments_cpu", side_effect=fake_cut), \
+         patch("ui.workers.concat_files", side_effect=fake_concat):
         with qtbot.waitSignal(worker.export_complete, timeout=5000) as blocker:
             worker.start(); worker.wait()
     assert blocker.args[0] == output
@@ -71,7 +72,7 @@ def test_export_worker_cleans_up_on_error(qapp, qtbot, tmp_path):
     output = str(tmp_path / "out.mp4")
     open(output, "w").close()
     worker = ExportWorker("input.mp4", segs, output, use_gpu=False)
-    with patch("app.cut_segments_cpu", side_effect=RuntimeError("ffmpeg failed")):
+    with patch("ui.workers.cut_segments_cpu", side_effect=RuntimeError("ffmpeg failed")):
         with qtbot.waitSignal(worker.error, timeout=5000):
             worker.start(); worker.wait()
     assert not os.path.exists(output)
