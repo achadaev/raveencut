@@ -414,7 +414,7 @@ class WaveformWidget(QWidget):
         n = len(self._pcm)
         offset, vis = self._scroll_offset_sec(), self._visible_duration()
         for bar_i, amp in enumerate(self._pcm):
-            t = offset + (bar_i / n) * vis if n else 0
+            t = (bar_i / n) * self._duration if n else 0
             x = self._time_to_x(t)
             if 0 <= x < w:
                 bar_h = int(amp * mid * 0.9)
