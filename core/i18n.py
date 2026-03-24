@@ -1,6 +1,5 @@
 import builtins
 import gettext as _gettext
-import os
 import sys
 from pathlib import Path
 
