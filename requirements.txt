@@ -1,0 +1,5 @@
+PyQt6
+torch
+numpy
+silero-vad
+rich
