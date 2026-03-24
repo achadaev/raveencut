@@ -10,12 +10,13 @@
 #
 # Output: dist\RaveenCut\RaveenCut.exe  (one-folder bundle)
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files
+from PyInstaller.utils.hooks import collect_all
 
 # Collect all files from packages that PyInstaller can miss
 torch_datas,   torch_bins,   torch_hidden   = collect_all("torch")
 silero_datas,  silero_bins,  silero_hidden  = collect_all("silero_vad")
 numpy_datas,   numpy_bins,   numpy_hidden   = collect_all("numpy")
+ort_datas,     ort_bins,     ort_hidden     = collect_all("onnxruntime")
 
 block_cipher = None
 
@@ -29,23 +30,27 @@ a = Analysis(
         *torch_bins,
         *silero_bins,
         *numpy_bins,
+        *ort_bins,
     ],
     datas=[
         *torch_datas,
         *silero_datas,
         *numpy_datas,
+        *ort_datas,
     ],
     hiddenimports=[
         "torch",
         "torch.nn",
         "torch.nn.functional",
         "numpy",
+        "onnxruntime",
         "silero_vad",
         "PyQt6.QtMultimedia",
         "PyQt6.QtMultimediaWidgets",
         *torch_hidden,
         *silero_hidden,
         *numpy_hidden,
+        *ort_hidden,
     ],
     hookspath=[],
     hooksconfig={},

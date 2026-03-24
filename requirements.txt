@@ -1,5 +1,6 @@
 PyQt6
 torch
 numpy
+onnxruntime
 silero-vad
 rich
