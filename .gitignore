@@ -6,4 +6,6 @@ venv/
 dist/
 build/
 .superpowers/
-*.spec
+# vendor FFmpeg binaries (too large for git — see vendor/README.md)
+vendor/*.exe
+vendor/*.dll

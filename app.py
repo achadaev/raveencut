@@ -1,5 +1,5 @@
 """RaveenCut — silence removal desktop app."""
-import json, os, shutil, subprocess, tempfile, time
+import json, os, shutil, subprocess, sys, tempfile, time
 
 import numpy as np
 import torch
@@ -15,6 +15,21 @@ from PyQt6.QtWidgets import (
     QStackedWidget, QVBoxLayout, QWidget,
 )
 from silero_vad import load_silero_vad
+
+def _ff_bin(name: str) -> str:
+    """Return the path to an ffmpeg binary.
+
+    When running as a PyInstaller-frozen executable the binaries are
+    extracted alongside the app inside sys._MEIPASS.  In development
+    we fall back to whatever is on PATH.
+    """
+    if getattr(sys, "frozen", False):
+        ext = ".exe" if os.name == "nt" else ""
+        candidate = os.path.join(sys._MEIPASS, name + ext)
+        if os.path.isfile(candidate):
+            return candidate
+    return name  # rely on PATH
+
 
 # Constants
 SAMPLING_RATE   = 16_000
@@ -35,9 +50,10 @@ def run(cmd):
         raise RuntimeError(f"FFmpeg failed: {result.stderr}")
     return result
 def probe_video_duration_sec(video_path):
-    if not shutil.which("ffprobe"):
+    ffprobe = _ff_bin("ffprobe")
+    if not (os.path.isfile(ffprobe) or shutil.which(ffprobe)):
         return None
-    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+    cmd = [ffprobe, "-v", "error", "-show_entries", "format=duration",
            "-of", "json", video_path]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -45,9 +61,10 @@ def probe_video_duration_sec(video_path):
     except (json.JSONDecodeError, KeyError, ValueError, subprocess.CalledProcessError):
         return None
 def read_audio_from_video(video_path, sampling_rate=SAMPLING_RATE):
-    if not shutil.which("ffmpeg"):
-        raise RuntimeError("ffmpeg not found on PATH")
-    cmd = ["ffmpeg", "-i", video_path,
+    ffmpeg = _ff_bin("ffmpeg")
+    if not (os.path.isfile(ffmpeg) or shutil.which(ffmpeg)):
+        raise RuntimeError("ffmpeg not found. Please install FFmpeg and add it to PATH.")
+    cmd = [ffmpeg, "-i", video_path,
            "-f", "f32le", "-ac", "1", "-ar", str(sampling_rate), "-"]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL, bufsize=10**6)
@@ -125,7 +142,7 @@ def resolve_output_path(input_path: str) -> str:
 def nvenc_available():
     try:
         result = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-encoders"],
+            [_ff_bin("ffmpeg"), "-hide_banner", "-encoders"],
             capture_output=True, text=True,
         )
         return "h264_nvenc" in result.stdout
@@ -135,7 +152,7 @@ def cut_segments_gpu(video_path, segments, tmpdir, progress_cb=None):
     outputs = []
     for i, seg in enumerate(segments):
         out = os.path.join(tmpdir, f"seg_{i:06d}.mp4")
-        run(["ffmpeg", "-y", "-hwaccel", "cuda",
+        run([_ff_bin("ffmpeg"), "-y", "-hwaccel", "cuda",
              "-ss", str(seg["start"]), "-to", str(seg["end"]),
              "-i", video_path,
              "-c:v", "h264_nvenc", "-preset", "p1", "-cq", "28", "-rc", "vbr",
@@ -147,7 +164,7 @@ def cut_segments_cpu(video_path, segments, tmpdir, progress_cb=None):
     outputs = []
     for i, seg in enumerate(segments):
         out = os.path.join(tmpdir, f"seg_{i:06d}.mp4")
-        run(["ffmpeg", "-y",
+        run([_ff_bin("ffmpeg"), "-y",
              "-ss", str(seg["start"]), "-to", str(seg["end"]),
              "-i", video_path,
              "-c:v", "libx264", "-preset", "fast", "-crf", "23",
@@ -161,7 +178,7 @@ def concat_files(files, output_path, tmpdir):
         for path in files:
             escaped = path.replace("'", "'\\''")
             f.write(f"file '{escaped}'\n")
-    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+    run([_ff_bin("ffmpeg"), "-y", "-f", "concat", "-safe", "0",
          "-i", list_file, "-c", "copy", output_path])
 
 class AnalysisWorker(QThread):
