@@ -1,0 +1,104 @@
+# Russian translations for RaveenCut
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Drop a video file here"
+msgstr "Перетащите видео сюда"
+
+msgid "Browse…"
+msgstr "Обзор…"
+
+msgid "Open Video"
+msgstr "Открыть видео"
+
+msgid "Video files (*.mp4 *.mov *.mkv *.avi *.webm)"
+msgstr "Видеофайлы (*.mp4 *.mov *.mkv *.avi *.webm)"
+
+msgid "'{name}' is not supported. Use: mp4, mov, mkv, avi, webm."
+msgstr "'{name}' не поддерживается. Используйте: mp4, mov, mkv, avi, webm."
+
+msgid "<- Back"
+msgstr "← Назад"
+
+msgid "Threshold: {v:.2f}"
+msgstr "Порог: {v:.2f}"
+
+msgid "Min silence: {v:.1f}s"
+msgstr "Мин. тишина: {v:.1f}с"
+
+msgid "Padding: {v:.2f}s"
+msgstr "Отступ: {v:.2f}с"
+
+msgid "Analyzing..."
+msgstr "Анализ..."
+
+msgid "Analysis failed: "
+msgstr "Ошибка анализа: "
+
+msgid "Silence regions (click to preview, click again to restore):"
+msgstr "Участки тишины (клик — просмотр, ещё раз — восстановить):"
+
+msgid "restore {t}"
+msgstr "восстановить {t}"
+
+msgid "Export"
+msgstr "Экспорт"
+
+msgid "Kept: {kept} / {total} ({pct:.0f}%)\nSegments: {n}"
+msgstr "Сохранено: {kept} / {total} ({pct:.0f}%)\nСегментов: {n}"
+
+msgid "Cannot determine output directory."
+msgstr "Не удалось определить папку для сохранения."
+
+msgid "Error"
+msgstr "Ошибка"
+
+msgid "Export complete"
+msgstr "Экспорт завершён"
+
+msgid "Saved to:\n{path}"
+msgstr "Сохранено в:\n{path}"
+
+msgid "Open File"
+msgstr "Открыть файл"
+
+msgid "Open Folder"
+msgstr "Открыть папку"
+
+msgid "Close"
+msgstr "Закрыть"
+
+msgid "Export failed"
+msgstr "Ошибка экспорта"
+
+msgid "Retry"
+msgstr "Повторить"
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "Extracting audio…"
+msgstr "Извлечение аудио…"
+
+msgid "Loading VAD model…"
+msgstr "Загрузка модели VAD…"
+
+msgid "Detecting speech… {done}/{n} frames"
+msgstr "Обнаружение речи… {done}/{n} кадров"
+
+msgid "Computing segments…"
+msgstr "Вычисление сегментов…"
+
+msgid "Cutting {done}/{total}{eta}"
+msgstr "Нарезка {done}/{total}{eta}"
+
+msgid "  —  {eta} left"
+msgstr "  —  осталось {eta}"
+
+msgid "Concatenating…"
+msgstr "Склейка…"
+
+msgid "Done"
+msgstr "Готово"

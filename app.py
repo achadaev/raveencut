@@ -1,5 +1,6 @@
 """RaveenCut — silence removal desktop app."""
-import json, os, shutil, subprocess, sys, tempfile, time
+import builtins, gettext as _gettext, json, os, shutil, subprocess, sys, tempfile, time
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -29,6 +30,28 @@ def _ff_bin(name: str) -> str:
         if os.path.isfile(candidate):
             return candidate
     return name  # rely on PATH
+
+
+def _locale_dir() -> Path:
+    """Return the locale directory, handling PyInstaller frozen exes."""
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "locale"
+    return Path(__file__).parent / "locale"
+
+
+def set_language(lang: str) -> None:
+    """Install gettext translation for *lang* into builtins._."""
+    translation = _gettext.translation(
+        "raveencut", localedir=_locale_dir(), languages=[lang], fallback=True
+    )
+    translation.install()
+
+
+# Fallback no-op _ until set_language() installs the real translator
+builtins._ = lambda s: s
+
+# Default language
+set_language("ru")
 
 
 def _subprocess_hide_console():
@@ -214,12 +237,12 @@ class AnalysisWorker(QThread):
         self.cached_probs = []
 
     def _extract_audio(self):
-        self.progress.emit(5, "Extracting audio…")
+        self.progress.emit(5, _("Extracting audio\u2026"))
         wav = read_audio_from_video(self.video_path)
         return wav, len(wav) / SAMPLING_RATE
 
     def _compute_probs(self, wav):
-        self.progress.emit(20, "Loading VAD model…")
+        self.progress.emit(20, _("Loading VAD model\u2026"))
         model = load_silero_vad(onnx=True)
         model.reset_states()
         probs = []
@@ -233,7 +256,9 @@ class AnalysisWorker(QThread):
             done = len(probs)
             if done % 500 == 0:
                 pct = 20 + int(done / n_frames * 70)
-                self.progress.emit(pct, f"Detecting speech… {done}/{n_frames} frames")
+                self.progress.emit(
+                    pct, _("Detecting speech\u2026 {done}/{n} frames").format(done=done, n=n_frames)
+                )
         return probs
 
     @staticmethod
@@ -253,12 +278,12 @@ class AnalysisWorker(QThread):
             wav, duration = self._extract_audio()
             probs = self._compute_probs(wav)
             self.cached_probs = probs
-            self.progress.emit(92, "Computing segments…")
+            self.progress.emit(92, _("Computing segments\u2026"))
             segs = probs_to_segments(probs, DEFAULT_THRESHOLD)
             segs = merge_segments(segs, min_gap=DEFAULT_MIN_SILENCE)
             segs = pad_segments(segs, pad=DEFAULT_PADDING, max_duration=duration)
             pcm = self._downsample_pcm(wav)
-            self.progress.emit(100, "Done")
+            self.progress.emit(100, _("Done"))
             self.analysis_complete.emit(segs, pcm, duration)
         except Exception as exc:
             self.error.emit(str(exc))
@@ -284,15 +309,20 @@ class ExportWorker(QThread):
                     elapsed = time.monotonic() - start
                     if done > 0:
                         eta = elapsed / done * (total_segs - done)
-                        eta_str = f"  —  {fmt_time(eta)} left"
+                        eta_str = _("  \u2014  {eta} left").format(eta=fmt_time(eta))
                     else:
                         eta_str = ""
-                    self.progress.emit(pct, f"Cutting {done}/{total_segs}{eta_str}")
+                    self.progress.emit(
+                        pct,
+                        _("Cutting {done}/{total}{eta}").format(
+                            done=done, total=total_segs, eta=eta_str
+                        ),
+                    )
                 cut_fn = cut_segments_gpu if self.use_gpu else cut_segments_cpu
                 seg_files = cut_fn(self.video_path, self.segments, tmpdir, cb)
-                self.progress.emit(91, "Concatenating…")
+                self.progress.emit(91, _("Concatenating\u2026"))
                 concat_files(seg_files, self.output_path, tmpdir)
-                self.progress.emit(100, "Done")
+                self.progress.emit(100, _("Done"))
                 self.export_complete.emit(self.output_path)
             except Exception as exc:
                 if os.path.exists(self.output_path):
@@ -478,13 +508,13 @@ class ImportView(QWidget):
         super().__init__(parent)
         self.setAcceptDrops(True)
 
-        self._drop_label = QLabel("Drop a video file here")
+        self._drop_label = QLabel("")
         self._drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._drop_label.setStyleSheet(
             "border: 2px dashed #555; border-radius: 8px;"
             "font-size: 18px; color: #aaa; padding: 60px;"
         )
-        self._browse_btn = QPushButton("Browse…")
+        self._browse_btn = QPushButton("")
         self._browse_btn.clicked.connect(self._browse)
 
         self._error_label = QLabel("")
@@ -492,7 +522,15 @@ class ImportView(QWidget):
         self._error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._error_label.setVisible(False)
 
+        self._lang_btn = QPushButton("EN")
+        self._lang_btn.setFixedWidth(40)
+
+        top_bar = QHBoxLayout()
+        top_bar.addStretch()
+        top_bar.addWidget(self._lang_btn)
+
         layout = QVBoxLayout(self)
+        layout.addLayout(top_bar)
         layout.addStretch()
         layout.addWidget(self._drop_label)
         layout.addSpacing(12)
@@ -500,10 +538,12 @@ class ImportView(QWidget):
         layout.addWidget(self._error_label)
         layout.addStretch()
 
+        self.retranslate()
+
     def _browse(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Open Video",
-            filter="Video files (*.mp4 *.mov *.mkv *.avi *.webm)",
+        path, __ = QFileDialog.getOpenFileName(
+            self, _("Open Video"),
+            filter=_("Video files (*.mp4 *.mov *.mkv *.avi *.webm)"),
         )
         if path:
             self._handle_path(path)
@@ -512,7 +552,9 @@ class ImportView(QWidget):
         ext = os.path.splitext(path)[1].lower()
         if ext not in SUPPORTED_EXTS:
             self._error_label.setText(
-                f"'{ext or path}' is not supported. Use: mp4, mov, mkv, avi, webm."
+                _("'{name}' is not supported. Use: mp4, mov, mkv, avi, webm.").format(
+                    name=ext or path
+                )
             )
             self._error_label.setVisible(True)
             return
@@ -527,6 +569,10 @@ class ImportView(QWidget):
         for url in event.mimeData().urls():
             self._handle_path(url.toLocalFile())
             break
+
+    def retranslate(self):
+        self._drop_label.setText(_("Drop a video file here"))
+        self._browse_btn.setText(_("Browse\u2026"))
 
 
 class MainView(QWidget):
@@ -544,16 +590,25 @@ class MainView(QWidget):
         self._pending_chip = None
         self._pending_chip_idx = -1
         self._chips = []
+        # Format strings — set by retranslate(), defaults prevent AttributeError on init
+        self._thr_fmt = "Threshold: {v:.2f}"
+        self._sil_fmt = "Min silence: {v:.1f}s"
+        self._pad_fmt = "Padding: {v:.2f}s"
+        self._stats_fmt = "Kept: {kept} / {total} ({pct:.0f}%)\nSegments: {n}"
+        self._restore_fmt = "restore {t}"
 
         # --- Header ---
         self._title_label = QLabel("RaveenCut")
         self._title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
-        self._back_btn = QPushButton("<- Back")
+        self._back_btn = QPushButton("")
         self._back_btn.clicked.connect(self._on_back)
         header = QHBoxLayout()
         header.addWidget(self._back_btn)
         header.addWidget(self._title_label)
         header.addStretch()
+        self._lang_btn = QPushButton("EN")
+        self._lang_btn.setFixedWidth(40)
+        header.addWidget(self._lang_btn)
 
         # --- Video player ---
         self._video_player = VideoPlayerWidget()
@@ -561,15 +616,15 @@ class MainView(QWidget):
         # --- Controls panel (fixed 240px) ---
         self._thr_slider = QSlider(Qt.Orientation.Horizontal)
         self._thr_slider.setRange(10, 90); self._thr_slider.setValue(50)
-        self._thr_label = QLabel("Threshold: 0.50")
+        self._thr_label = QLabel("")
 
         self._sil_slider = QSlider(Qt.Orientation.Horizontal)
         self._sil_slider.setRange(1, 20); self._sil_slider.setValue(6)
-        self._sil_label = QLabel("Min silence: 0.6s")
+        self._sil_label = QLabel("")
 
         self._pad_slider = QSlider(Qt.Orientation.Horizontal)
         self._pad_slider.setRange(0, 20); self._pad_slider.setValue(7)
-        self._pad_label = QLabel("Padding: 0.35s")
+        self._pad_label = QLabel("")
 
         self._stats_label = QLabel("")
         self._stats_label.setWordWrap(True)
@@ -613,7 +668,7 @@ class MainView(QWidget):
 
         self._progress_bar = QProgressBar()
         self._progress_bar.setRange(0, 100)
-        self._status_label = QLabel("Analyzing...")
+        self._status_label = QLabel("")
         self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         progress_layout = QVBoxLayout()
         progress_layout.addStretch()
@@ -633,8 +688,8 @@ class MainView(QWidget):
         self._warning_label.setVisible(False)
 
         # --- Chips strip ---
-        chips_header = QLabel("Silence regions (click to preview, click again to restore):")
-        chips_header.setStyleSheet("color: #888; font-size: 11px;")
+        self._chips_header = QLabel("")
+        self._chips_header.setStyleSheet("color: #888; font-size: 11px;")
         self._chips_layout = QHBoxLayout()
         self._chips_layout.setContentsMargins(4, 2, 4, 2)
         self._chips_layout.addStretch()
@@ -648,7 +703,7 @@ class MainView(QWidget):
         chips_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         # --- Export row ---
-        self._export_btn = QPushButton("Export")
+        self._export_btn = QPushButton("")
         self._export_btn.setEnabled(False)
         self._export_progress = QProgressBar()
         self._export_progress.setRange(0, 100)
@@ -667,9 +722,11 @@ class MainView(QWidget):
         main_layout.addLayout(top_row)
         main_layout.addWidget(self._waveform_stack)
         main_layout.addWidget(self._warning_label)
-        main_layout.addWidget(chips_header)
+        main_layout.addWidget(self._chips_header)
         main_layout.addWidget(chips_scroll)
         main_layout.addLayout(export_row)
+
+        self.retranslate()
 
     # -- Public API --
 
@@ -717,7 +774,7 @@ class MainView(QWidget):
     def _on_analysis_error(self, msg):
         self._analysis_worker = None
         self._waveform_stack.setCurrentIndex(0)
-        self._warning_label.setText(f"Analysis failed: {msg}")
+        self._warning_label.setText(_("Analysis failed: ") + msg)
         self._warning_label.setVisible(True)
 
     def _on_slider_released(self):
@@ -739,9 +796,9 @@ class MainView(QWidget):
         self._export_btn.setEnabled(bool(segs))
 
     def _update_slider_labels(self):
-        self._thr_label.setText(f"Threshold: {self._thr_slider.value()/100:.2f}")
-        self._sil_label.setText(f"Min silence: {self._sil_slider.value()/10:.1f}s")
-        self._pad_label.setText(f"Padding: {self._pad_slider.value()/20:.2f}s")
+        self._thr_label.setText(self._thr_fmt.format(v=self._thr_slider.value() / 100))
+        self._sil_label.setText(self._sil_fmt.format(v=self._sil_slider.value() / 10))
+        self._pad_label.setText(self._pad_fmt.format(v=self._pad_slider.value() / 20))
 
     def _rebuild_waveform(self):
         pcm = getattr(self, "_pcm", None)
@@ -791,7 +848,9 @@ class MainView(QWidget):
             seg = self._silence_segs[idx]
             self._video_player.seek(seg["start"])
             chip.setChecked(True)
-            chip.setText(f"restore {fmt_time(seg['start'])}-{fmt_time(seg['end'])}")
+            chip.setText(
+                self._restore_fmt.format(t=f"{fmt_time(seg['start'])}-{fmt_time(seg['end'])}")
+            )
 
     def _update_stats(self):
         total = getattr(self, "_duration", 0.0)
@@ -801,13 +860,17 @@ class MainView(QWidget):
                     if i < len(self._silence_segs))
         pct = (kept / total * 100) if total > 0 else 0
         self._stats_label.setText(
-            f"Kept: {fmt_time(kept)} / {fmt_time(total)} ({pct:.0f}%)\n"
-            f"Segments: {len(self._speech_segs)}"
+            self._stats_fmt.format(
+                kept=fmt_time(kept),
+                total=fmt_time(total),
+                pct=pct,
+                n=len(self._speech_segs),
+            )
         )
 
     def _on_export(self):
         if not os.path.isdir(os.path.dirname(os.path.abspath(self._video_path))):
-            QMessageBox.warning(self, "Error", "Cannot determine output directory.")
+            QMessageBox.warning(self, _("Error"), _("Cannot determine output directory."))
             return
         output = resolve_output_path(self._video_path)
         use_gpu = nvenc_available()
@@ -834,11 +897,11 @@ class MainView(QWidget):
         self._back_btn.setEnabled(True)
         dir_ = os.path.dirname(os.path.abspath(path))
         msg = QMessageBox(self)
-        msg.setWindowTitle("Export complete")
-        msg.setText(f"Saved to:\n{path}")
-        open_file_btn = msg.addButton("Open File", QMessageBox.ButtonRole.ActionRole)
-        open_folder_btn = msg.addButton("Open Folder", QMessageBox.ButtonRole.ActionRole)
-        msg.addButton("Close", QMessageBox.ButtonRole.RejectRole)
+        msg.setWindowTitle(_("Export complete"))
+        msg.setText(_("Saved to:\n{path}").format(path=path))
+        open_file_btn = msg.addButton(_("Open File"), QMessageBox.ButtonRole.ActionRole)
+        open_folder_btn = msg.addButton(_("Open Folder"), QMessageBox.ButtonRole.ActionRole)
+        msg.addButton(_("Close"), QMessageBox.ButtonRole.RejectRole)
         msg.exec()
         if msg.clickedButton() == open_file_btn:
             subprocess.Popen(["explorer", "/select,", path.replace("/", "\\")])
@@ -851,10 +914,10 @@ class MainView(QWidget):
         self._export_btn.setVisible(True)
         self._back_btn.setEnabled(True)
         msg = QMessageBox(self)
-        msg.setWindowTitle("Export failed")
+        msg.setWindowTitle(_("Export failed"))
         msg.setText(err_msg)
-        retry_btn = msg.addButton("Retry", QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        retry_btn = msg.addButton(_("Retry"), QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton(_("Cancel"), QMessageBox.ButtonRole.RejectRole)
         msg.exec()
         if msg.clickedButton() == retry_btn:
             self._on_export()
@@ -870,6 +933,23 @@ class MainView(QWidget):
             self._analysis_worker = None
         self.back_requested.emit()
 
+    def retranslate(self):
+        self._back_btn.setText(_("<- Back"))
+        self._chips_header.setText(
+            _("Silence regions (click to preview, click again to restore):")
+        )
+        self._status_label.setText(_("Analyzing..."))
+        self._export_btn.setText(_("Export"))
+        self._thr_fmt = _("Threshold: {v:.2f}")
+        self._sil_fmt = _("Min silence: {v:.1f}s")
+        self._pad_fmt = _("Padding: {v:.2f}s")
+        self._stats_fmt = _("Kept: {kept} / {total} ({pct:.0f}%)\nSegments: {n}")
+        self._restore_fmt = _("restore {t}")
+        self._update_slider_labels()
+        self._update_stats()
+        if hasattr(self, "_silence_segs"):
+            self._rebuild_chips()
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -884,6 +964,20 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self._stack)
         self._import_view.file_selected.connect(self._on_file_selected)
         self._main_view.back_requested.connect(self._on_back)
+        self._import_view._lang_btn.clicked.connect(self._on_lang_toggle)
+        self._main_view._lang_btn.clicked.connect(self._on_lang_toggle)
+
+    def _on_lang_toggle(self):
+        import builtins as _b
+
+        current_ru = _b._("Export") == "Экспорт"
+        new_lang = "en" if current_ru else "ru"
+        set_language(new_lang)
+        btn_label = "RU" if new_lang == "en" else "EN"
+        self._import_view._lang_btn.setText(btn_label)
+        self._main_view._lang_btn.setText(btn_label)
+        self._import_view.retranslate()
+        self._main_view.retranslate()
 
     def _on_file_selected(self, path: str):
         self._stack.setCurrentIndex(1)

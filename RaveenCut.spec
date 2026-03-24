@@ -33,6 +33,7 @@ a = Analysis(
         *ort_bins,
     ],
     datas=[
+        ("locale", "locale"),
         *torch_datas,
         *silero_datas,
         *numpy_datas,

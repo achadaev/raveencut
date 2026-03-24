@@ -1,0 +1,104 @@
+# English translations for RaveenCut (msgid = English, so msgstr is empty)
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Drop a video file here"
+msgstr ""
+
+msgid "Browse…"
+msgstr ""
+
+msgid "Open Video"
+msgstr ""
+
+msgid "Video files (*.mp4 *.mov *.mkv *.avi *.webm)"
+msgstr ""
+
+msgid "'{name}' is not supported. Use: mp4, mov, mkv, avi, webm."
+msgstr ""
+
+msgid "<- Back"
+msgstr ""
+
+msgid "Threshold: {v:.2f}"
+msgstr ""
+
+msgid "Min silence: {v:.1f}s"
+msgstr ""
+
+msgid "Padding: {v:.2f}s"
+msgstr ""
+
+msgid "Analyzing..."
+msgstr ""
+
+msgid "Analysis failed: "
+msgstr ""
+
+msgid "Silence regions (click to preview, click again to restore):"
+msgstr ""
+
+msgid "restore {t}"
+msgstr ""
+
+msgid "Export"
+msgstr ""
+
+msgid "Kept: {kept} / {total} ({pct:.0f}%)\nSegments: {n}"
+msgstr ""
+
+msgid "Cannot determine output directory."
+msgstr ""
+
+msgid "Error"
+msgstr ""
+
+msgid "Export complete"
+msgstr ""
+
+msgid "Saved to:\n{path}"
+msgstr ""
+
+msgid "Open File"
+msgstr ""
+
+msgid "Open Folder"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "Export failed"
+msgstr ""
+
+msgid "Retry"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Extracting audio…"
+msgstr ""
+
+msgid "Loading VAD model…"
+msgstr ""
+
+msgid "Detecting speech… {done}/{n} frames"
+msgstr ""
+
+msgid "Computing segments…"
+msgstr ""
+
+msgid "Cutting {done}/{total}{eta}"
+msgstr ""
+
+msgid "  —  {eta} left"
+msgstr ""
+
+msgid "Concatenating…"
+msgstr ""
+
+msgid "Done"
+msgstr ""

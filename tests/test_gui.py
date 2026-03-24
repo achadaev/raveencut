@@ -108,7 +108,8 @@ def test_import_view_rejects_bad_ext(qapp, qtbot):
     v = ImportView(); qtbot.addWidget(v); v.show()
     v._handle_path("video.txt")
     assert v._error_label.isVisible()
-    assert "not supported" in v._error_label.text().lower()
+    err = v._error_label.text()
+    assert "txt" in err.lower() and "mp4" in err.lower()
 
 def test_import_view_accepts_mp4(qapp, qtbot):
     v = ImportView(); qtbot.addWidget(v); v.show()
