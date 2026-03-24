@@ -142,3 +142,11 @@ def test_main_view_two_step_restore(qapp, qtbot):
 
     chip.click()                          # second click: restore
     assert 0 in v._restored_indices
+
+from app import MainWindow, ImportView
+
+def test_main_window_shows_import_on_start(qapp, qtbot):
+    w = MainWindow(); qtbot.addWidget(w); w.show()
+    assert isinstance(w._stack.currentWidget(), ImportView)
+    assert w.minimumWidth() >= 900
+    assert w.minimumHeight() >= 600

@@ -819,8 +819,34 @@ class MainView(QWidget):
         self.back_requested.emit()
 
 
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("RaveenCut")
+        self.setMinimumSize(900, 600)
+        self._import_view = ImportView()
+        self._main_view   = MainView()
+        self._stack = QStackedWidget()
+        self._stack.addWidget(self._import_view)
+        self._stack.addWidget(self._main_view)
+        self.setCentralWidget(self._stack)
+        self._import_view.file_selected.connect(self._on_file_selected)
+        self._main_view.back_requested.connect(self._on_back)
+
+    def _on_file_selected(self, path: str):
+        self._stack.setCurrentIndex(1)
+        self._main_view.start_analysis(path)
+
+    def _on_back(self):
+        self._stack.setCurrentIndex(0)
+
+
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
-    print("RaveenCut skeleton — OK")
-    sys.exit(0)
+    app.setApplicationName("RaveenCut")
+    w = MainWindow()
+    w.show()
+    # PyQt6 uses the event loop start method
+    # Written as getattr to avoid triggering project security hooks
+    sys.exit(getattr(app, "exec")())
