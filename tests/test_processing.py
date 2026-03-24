@@ -151,3 +151,45 @@ def test_read_audio_returns_tensor():
         t = read_audio_from_video("x.mp4")
     assert t.shape == (4,)
     assert abs(t[0].item() - 0.1) < 1e-5
+
+from app import nvenc_available, cut_segments_gpu, cut_segments_cpu, concat_files
+
+def test_nvenc_available_true():
+    mock = MagicMock(); mock.stdout = "h264_nvenc encoder"
+    with patch("subprocess.run", return_value=mock):
+        assert nvenc_available() is True
+
+def test_nvenc_available_false():
+    mock = MagicMock(); mock.stdout = "libx264 encoder"
+    with patch("subprocess.run", return_value=mock):
+        assert nvenc_available() is False
+
+def test_cut_segments_gpu_calls_ffmpeg(tmp_path):
+    segs = [{"start": 0.0, "end": 1.0}, {"start": 2.0, "end": 3.0}]
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(cmd); open(cmd[-1], "w").close()
+        r = MagicMock(); r.returncode = 0; return r
+    with patch("subprocess.run", side_effect=fake_run):
+        outputs = cut_segments_gpu("input.mp4", segs, str(tmp_path))
+    assert len(outputs) == 2
+    assert "h264_nvenc" in calls[0]
+
+def test_cut_segments_cpu_uses_libx264(tmp_path):
+    segs = [{"start": 0.0, "end": 1.0}]
+    def fake_run(cmd, **kw):
+        open(cmd[-1], "w").close()
+        r = MagicMock(); r.returncode = 0; return r
+    with patch("subprocess.run", side_effect=fake_run):
+        outputs = cut_segments_cpu("input.mp4", segs, str(tmp_path))
+    assert len(outputs) == 1
+
+def test_concat_files_writes_list_and_calls_ffmpeg(tmp_path):
+    files = [str(tmp_path/"a.mp4"), str(tmp_path/"b.mp4")]
+    called = []
+    def fake_run(cmd, **kw):
+        called.append(cmd); r = MagicMock(); r.returncode = 0; return r
+    with patch("subprocess.run", side_effect=fake_run):
+        concat_files(files, str(tmp_path/"out.mp4"), str(tmp_path))
+    assert (tmp_path/"concat.txt").exists()
+    assert called[0][0] == "ffmpeg"
