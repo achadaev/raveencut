@@ -721,12 +721,10 @@ class MainView(QWidget):
         if self._pending_chip_idx == idx:
             # Second click: restore
             self._restored_indices.add(idx)
+            if chip in self._chips:
+                self._chips.remove(chip)
             chip.setParent(None)
             chip.deleteLater()
-            if idx < len(self._chips):
-                self._chips.pop(idx)
-                # Re-index remaining chips
-                self._chips = [c for c in self._chips if c is not None]
             self._pending_chip = None
             self._pending_chip_idx = -1
             self._rebuild_waveform()
