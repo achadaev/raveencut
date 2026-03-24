@@ -719,7 +719,7 @@ class MainView(QWidget):
         # --- Main layout ---
         main_layout = QVBoxLayout(self)
         main_layout.addLayout(header)
-        main_layout.addLayout(top_row)
+        main_layout.addLayout(top_row, stretch=1)
         main_layout.addWidget(self._waveform_stack)
         main_layout.addWidget(self._warning_label)
         main_layout.addWidget(self._chips_header)
