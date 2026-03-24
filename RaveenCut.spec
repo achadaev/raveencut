@@ -68,7 +68,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,  # UPX breaks many native DLLs (e.g. PyTorch c10.dll → WinError 1114)
     console=False,          # no terminal window
     disable_windowed_traceback=False,
     target_arch=None,
@@ -82,7 +82,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name="RaveenCut",
 )
