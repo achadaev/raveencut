@@ -6,6 +6,7 @@ venv/
 dist/
 build/
 .superpowers/
+.worktrees/
 # vendor FFmpeg binaries (too large for git — see vendor/README.md)
 vendor/*.exe
 vendor/*.dll
