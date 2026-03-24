@@ -31,6 +31,13 @@ def _ff_bin(name: str) -> str:
     return name  # rely on PATH
 
 
+def _subprocess_hide_console():
+    """Avoid flashing a console window when spawning ffmpeg/ffprobe on Windows."""
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
 # Constants
 SAMPLING_RATE   = 16_000
 FRAME_SIZE      = 512
@@ -43,7 +50,9 @@ WAVEFORM_BARS   = 2_000
 # Stubs — replaced in subsequent tasks
 def run(cmd):
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, **_subprocess_hide_console()
+        )
     except FileNotFoundError:
         raise RuntimeError(f"'{cmd[0]}' not found on PATH. Please install ffmpeg.")
     if result.returncode != 0:
@@ -56,7 +65,13 @@ def probe_video_duration_sec(video_path):
     cmd = [ffprobe, "-v", "error", "-show_entries", "format=duration",
            "-of", "json", video_path]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            **_subprocess_hide_console(),
+        )
         return float(json.loads(result.stdout)["format"]["duration"])
     except (json.JSONDecodeError, KeyError, ValueError, subprocess.CalledProcessError):
         return None
@@ -66,8 +81,13 @@ def read_audio_from_video(video_path, sampling_rate=SAMPLING_RATE):
         raise RuntimeError("ffmpeg not found. Please install FFmpeg and add it to PATH.")
     cmd = [ffmpeg, "-i", video_path,
            "-f", "f32le", "-ac", "1", "-ar", str(sampling_rate), "-"]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.DEVNULL, bufsize=10**6)
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        bufsize=10**6,
+        **_subprocess_hide_console(),
+    )
     raw = proc.stdout.read()
     returncode = proc.wait()
     if (returncode is not None and returncode != 0) or not raw:
@@ -143,7 +163,9 @@ def nvenc_available():
     try:
         result = subprocess.run(
             [_ff_bin("ffmpeg"), "-hide_banner", "-encoders"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
+            **_subprocess_hide_console(),
         )
         return "h264_nvenc" in result.stdout
     except FileNotFoundError:
