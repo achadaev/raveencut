@@ -2,34 +2,12 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 
 import numpy as np
 import torch
 
 from core.constants import SAMPLING_RATE
-
-
-def _ff_bin(name: str) -> str:
-    """Return the path to an ffmpeg binary.
-
-    When running as a PyInstaller-frozen executable the binaries are
-    extracted alongside the app inside sys._MEIPASS.  In development
-    we fall back to whatever is on PATH.
-    """
-    if getattr(sys, "frozen", False):
-        ext = ".exe" if os.name == "nt" else ""
-        candidate = os.path.join(sys._MEIPASS, name + ext)
-        if os.path.isfile(candidate):
-            return candidate
-    return name  # rely on PATH
-
-
-def _subprocess_hide_console():
-    """Avoid flashing a console window when spawning ffmpeg/ffprobe on Windows."""
-    if os.name == "nt":
-        return {"creationflags": subprocess.CREATE_NO_WINDOW}
-    return {}
+from core.utils import _ff_bin, _subprocess_hide_console
 
 
 def probe_video_duration_sec(video_path):
