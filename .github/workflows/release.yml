@@ -22,10 +22,6 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
-          # Default PyPI torch is often CUDA-enabled; CPU wheel avoids c10/CUDA
-          # load failures on machines without a matching NVIDIA driver stack.
-          pip uninstall -y torch
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install pyinstaller
 
       - name: Download FFmpeg
