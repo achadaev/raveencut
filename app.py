@@ -1,5 +1,5 @@
 """RaveenCut — silence removal desktop app."""
-import json, os, shutil, subprocess, tempfile
+import json, os, shutil, subprocess, tempfile, time
 
 import numpy as np
 import torch
@@ -239,9 +239,16 @@ class ExportWorker(QThread):
     def run(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
+                start = time.monotonic()
                 def cb(done, total_segs):
                     pct = int(done / total_segs * 90)
-                    self.progress.emit(pct, f"Cutting {done}/{total_segs}…")
+                    elapsed = time.monotonic() - start
+                    if done > 0:
+                        eta = elapsed / done * (total_segs - done)
+                        eta_str = f"  —  {fmt_time(eta)} left"
+                    else:
+                        eta_str = ""
+                    self.progress.emit(pct, f"Cutting {done}/{total_segs}{eta_str}")
                 cut_fn = cut_segments_gpu if self.use_gpu else cut_segments_cpu
                 seg_files = cut_fn(self.video_path, self.segments, tmpdir, cb)
                 self.progress.emit(91, "Concatenating…")
@@ -412,6 +419,12 @@ class VideoPlayerWidget(QWidget):
         dur = self._player.duration() / 1000.0
         self._time_label.setText(f"{fmt_time(sec)} / {fmt_time(dur)}")
         self.position_changed.emit(sec)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return width * 9 // 16 + 36  # 16:9 video + controls bar
 
     def _on_state(self, state):
         self._play_btn.setText(
@@ -823,7 +836,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("RaveenCut")
-        self.setMinimumSize(900, 600)
+        self.setMinimumSize(1100, 720)
         self._import_view = ImportView()
         self._main_view   = MainView()
         self._stack = QStackedWidget()
