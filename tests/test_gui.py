@@ -97,3 +97,26 @@ def test_video_player_widget_creates(qapp, qtbot):
     qtbot.addWidget(w); w.show()
     assert w._play_btn is not None
     assert w._time_label is not None
+
+from app import ImportView
+
+def test_import_view_creates(qapp, qtbot):
+    v = ImportView(); qtbot.addWidget(v); v.show()
+    assert v.isVisible()
+
+def test_import_view_rejects_bad_ext(qapp, qtbot):
+    v = ImportView(); qtbot.addWidget(v); v.show()
+    v._handle_path("video.txt")
+    assert v._error_label.isVisible()
+    assert "not supported" in v._error_label.text().lower()
+
+def test_import_view_accepts_mp4(qapp, qtbot):
+    v = ImportView(); qtbot.addWidget(v); v.show()
+    with qtbot.waitSignal(v.file_selected, timeout=1000) as blocker:
+        v._handle_path("video.mp4")
+    assert blocker.args[0] == "video.mp4"
+
+def test_import_view_case_insensitive(qapp, qtbot):
+    v = ImportView(); qtbot.addWidget(v); v.show()
+    with qtbot.waitSignal(v.file_selected, timeout=1000):
+        v._handle_path("video.MP4")
