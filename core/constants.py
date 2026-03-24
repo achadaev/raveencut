@@ -1,0 +1,7 @@
+SAMPLING_RATE     = 16_000
+FRAME_SIZE        = 512
+SUPPORTED_EXTS    = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
+DEFAULT_THRESHOLD   = 0.50
+DEFAULT_MIN_SILENCE = 0.6
+DEFAULT_PADDING     = 0.35
+WAVEFORM_BARS     = 2_000
