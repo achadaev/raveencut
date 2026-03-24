@@ -70,3 +70,22 @@ def test_export_worker_cleans_up_on_error(qapp, qtbot, tmp_path):
         with qtbot.waitSignal(worker.error, timeout=5000):
             worker.start(); worker.wait()
     assert not os.path.exists(output)
+
+from app import WaveformWidget
+
+def test_waveform_widget_creates(qapp, qtbot):
+    w = WaveformWidget()
+    qtbot.addWidget(w); w.show()
+    assert w.isVisible()
+
+def test_waveform_seek_signal(qapp, qtbot):
+    w = WaveformWidget()
+    qtbot.addWidget(w); w.resize(800, 80)
+    pcm = np.random.rand(2000).astype(np.float32)
+    w.update_audio(pcm, duration=10.0)
+    w.update_segments([], [], set())
+    from PyQt6.QtCore import QPoint, Qt
+    from PyQt6.QtTest import QTest
+    with qtbot.waitSignal(w.seek_requested, timeout=1000) as blocker:
+        QTest.mouseClick(w, Qt.MouseButton.LeftButton, pos=QPoint(400, 40))
+    assert 0.0 <= blocker.args[0] <= 10.0
