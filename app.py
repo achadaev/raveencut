@@ -269,9 +269,9 @@ class AnalysisWorker(QThread):
                     pct, _("Detecting speech\u2026 {done}/{n} frames").format(done=done, n=n_frames)
                 )
             if self._cancel_requested:
-                return None
+                raise _CancelledError()
         if self._cancel_requested:
-            return None
+            raise _CancelledError()
         return probs
 
     @staticmethod
@@ -290,9 +290,6 @@ class AnalysisWorker(QThread):
         try:
             wav, duration = self._extract_audio()
             probs = self._compute_probs(wav)
-            if probs is None:
-                self.cancelled.emit()
-                return
             self.cached_probs = probs
             self.progress.emit(92, _("Computing segments\u2026"))
             segs = probs_to_segments(probs, DEFAULT_THRESHOLD)
@@ -301,6 +298,8 @@ class AnalysisWorker(QThread):
             pcm = self._downsample_pcm(wav)
             self.progress.emit(100, _("Done"))
             self.analysis_complete.emit(segs, pcm, duration)
+        except _CancelledError:
+            self.cancelled.emit()
         except Exception as exc:
             self.error.emit(str(exc))
 
