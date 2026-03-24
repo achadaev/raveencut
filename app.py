@@ -39,7 +39,7 @@ def probe_video_duration_sec(video_path):
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return float(json.loads(result.stdout)["format"]["duration"])
-    except Exception:
+    except (json.JSONDecodeError, KeyError, ValueError, subprocess.CalledProcessError):
         return None
 def read_audio_from_video(video_path, sampling_rate=SAMPLING_RATE):
     if not shutil.which("ffmpeg"):
@@ -49,8 +49,8 @@ def read_audio_from_video(video_path, sampling_rate=SAMPLING_RATE):
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL, bufsize=10**6)
     raw = proc.stdout.read()
-    proc.wait()
-    if not raw:
+    returncode = proc.wait()
+    if (returncode is not None and returncode != 0) or not raw:
         raise RuntimeError(
             "No audio data — file may have no audio track or be corrupt. "
             "Try converting to MP4 first."
