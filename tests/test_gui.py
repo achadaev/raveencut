@@ -199,6 +199,43 @@ def test_export_worker_cancel_does_not_emit_error(qapp, qtbot, tmp_path):
             worker.wait()
     assert errors == []
 
+def test_analysis_worker_emits_cancelled(qapp, qtbot):
+    wav = torch.zeros(SAMPLING_RATE)
+    worker = AnalysisWorker("fake.mp4")
+    worker.request_cancel()  # cancel before probs loop
+
+    with patch.object(worker, "_extract_audio", return_value=(wav, 1.0)):
+        with qtbot.waitSignal(worker.cancelled, timeout=5000):
+            worker.start()
+            worker.wait()
+
+def test_analysis_worker_cancel_does_not_emit_complete(qapp, qtbot):
+    wav = torch.zeros(SAMPLING_RATE)
+    worker = AnalysisWorker("fake.mp4")
+    worker.request_cancel()
+    completed = []
+    worker.analysis_complete.connect(lambda s, p, d: completed.append(True))
+
+    with patch.object(worker, "_extract_audio", return_value=(wav, 1.0)):
+        with qtbot.waitSignal(worker.cancelled, timeout=5000):
+            worker.start()
+            worker.wait()
+    assert completed == []
+
+def test_analysis_worker_cancel_preserves_cached_probs(qapp, qtbot):
+    wav = torch.zeros(SAMPLING_RATE)
+    n_frames = (SAMPLING_RATE + FRAME_SIZE - 1) // FRAME_SIZE
+    prior_probs = [0.5] * n_frames
+    worker = AnalysisWorker("fake.mp4")
+    worker.cached_probs = prior_probs  # simulate a prior successful run
+    worker.request_cancel()
+
+    with patch.object(worker, "_extract_audio", return_value=(wav, 1.0)):
+        with qtbot.waitSignal(worker.cancelled, timeout=5000):
+            worker.start()
+            worker.wait()
+    assert worker.cached_probs is prior_probs  # untouched
+
 from app import MainWindow, ImportView
 
 def test_main_window_shows_import_on_start(qapp, qtbot):

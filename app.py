@@ -234,11 +234,16 @@ class AnalysisWorker(QThread):
     progress          = pyqtSignal(int, str)
     analysis_complete = pyqtSignal(list, np.ndarray, float)
     error             = pyqtSignal(str)
+    cancelled         = pyqtSignal()
 
     def __init__(self, video_path, parent=None):
         super().__init__(parent)
         self.video_path = video_path
         self.cached_probs = []
+        self._cancel_requested = False
+
+    def request_cancel(self):
+        self._cancel_requested = True
 
     def _extract_audio(self):
         self.progress.emit(5, _("Extracting audio\u2026"))
@@ -263,6 +268,10 @@ class AnalysisWorker(QThread):
                 self.progress.emit(
                     pct, _("Detecting speech\u2026 {done}/{n} frames").format(done=done, n=n_frames)
                 )
+            if self._cancel_requested:
+                return None
+        if self._cancel_requested:
+            return None
         return probs
 
     @staticmethod
@@ -281,6 +290,9 @@ class AnalysisWorker(QThread):
         try:
             wav, duration = self._extract_audio()
             probs = self._compute_probs(wav)
+            if probs is None:
+                self.cancelled.emit()
+                return
             self.cached_probs = probs
             self.progress.emit(92, _("Computing segments\u2026"))
             segs = probs_to_segments(probs, DEFAULT_THRESHOLD)
