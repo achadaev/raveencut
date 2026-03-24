@@ -734,13 +734,17 @@ class MainView(QWidget):
         self._export_progress = QProgressBar()
         self._export_progress.setRange(0, 100)
         self._export_progress.setVisible(False)
+        self._export_cancel_btn = QPushButton(_("Cancel"))
+        self._export_cancel_btn.setVisible(False)
         self._export_label = QLabel("")
         export_row = QHBoxLayout()
         export_row.addWidget(self._export_btn)
         export_row.addWidget(self._export_progress)
+        export_row.addWidget(self._export_cancel_btn)
         export_row.addWidget(self._export_label)
         export_row.addStretch()
         self._export_btn.clicked.connect(self._on_export)
+        self._export_cancel_btn.clicked.connect(self._on_export_cancel_clicked)
 
         # --- Main layout ---
         main_layout = QVBoxLayout(self)
@@ -911,14 +915,18 @@ class MainView(QWidget):
         ))
         self._export_worker.export_complete.connect(self._on_export_complete)
         self._export_worker.error.connect(self._on_export_error)
+        self._export_worker.cancelled.connect(self._on_export_cancelled)
         self._export_btn.setVisible(False)
+        self._export_label.setText("")
         self._export_progress.setVisible(True)
+        self._export_cancel_btn.setVisible(True)
         self._back_btn.setEnabled(False)
         self._export_worker.start()
 
     def _on_export_complete(self, path):
         self._export_worker = None
         self._export_progress.setVisible(False)
+        self._export_cancel_btn.setVisible(False)
         self._export_btn.setVisible(True)
         self._back_btn.setEnabled(True)
         dir_ = os.path.dirname(os.path.abspath(path))
@@ -937,6 +945,7 @@ class MainView(QWidget):
     def _on_export_error(self, err_msg):
         self._export_worker = None
         self._export_progress.setVisible(False)
+        self._export_cancel_btn.setVisible(False)
         self._export_btn.setVisible(True)
         self._back_btn.setEnabled(True)
         msg = QMessageBox(self)
@@ -947,6 +956,28 @@ class MainView(QWidget):
         msg.exec()
         if msg.clickedButton() == retry_btn:
             self._on_export()
+
+    def _on_export_cancel_clicked(self):
+        reply = QMessageBox.question(
+            self,
+            _("Cancel export"),
+            _("Cancel export? The partial output file will be deleted."),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        if self._export_worker is None or not self._export_worker.isRunning():
+            return
+        self._export_cancel_btn.setEnabled(False)
+        self._export_worker.request_cancel()
+
+    def _on_export_cancelled(self):
+        self._export_worker = None
+        self._export_progress.setVisible(False)
+        self._export_cancel_btn.setVisible(False)
+        self._export_label.setText("")
+        self._export_btn.setVisible(True)
+        self._back_btn.setEnabled(True)
 
     def closeEvent(self, event):
         self._waveform.hide()

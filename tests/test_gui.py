@@ -236,6 +236,35 @@ def test_analysis_worker_cancel_preserves_cached_probs(qapp, qtbot):
             worker.wait()
     assert worker.cached_probs is prior_probs  # untouched
 
+def test_main_view_export_cancel_btn_hidden_by_default(qapp, qtbot):
+    v = MainView()
+    qtbot.addWidget(v)
+    assert not v._export_cancel_btn.isVisible()
+
+def test_main_view_export_cancelled_resets_ui(qapp, qtbot):
+    v = MainView()
+    qtbot.addWidget(v)
+    v.show()
+    segs = [{"start": 0.0, "end": 5.0}]
+    pcm = np.zeros(100, dtype=np.float32)
+    v.load_analysis(segs, pcm, 10.0, [0.5] * 200)
+
+    # Manually put UI into "export running" state
+    v._export_btn.setVisible(False)
+    v._export_progress.setVisible(True)
+    v._export_cancel_btn.setVisible(True)
+    v._export_cancel_btn.setEnabled(True)
+    v._export_label.setText("Cutting 1/3")
+    v._back_btn.setEnabled(False)
+
+    v._on_export_cancelled()
+
+    assert v._export_btn.isVisible()
+    assert not v._export_progress.isVisible()
+    assert not v._export_cancel_btn.isVisible()
+    assert v._export_label.text() == ""
+    assert v._back_btn.isEnabled()
+
 from app import MainWindow, ImportView
 
 def test_main_window_shows_import_on_start(qapp, qtbot):
