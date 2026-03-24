@@ -38,3 +38,35 @@ def test_analysis_worker_emits_error_on_bad_file(qapp, qtbot):
         worker.start()
         worker.wait()
     assert len(blocker.args[0]) > 0
+
+from app import ExportWorker
+
+def test_export_worker_emits_complete(qapp, qtbot, tmp_path):
+    from unittest.mock import patch
+    segs = [{"start": 0.0, "end": 1.0}]
+    output = str(tmp_path / "out.mp4")
+    worker = ExportWorker("input.mp4", segs, output, use_gpu=False)
+    cut_out = [str(tmp_path / "seg_000000.mp4")]
+
+    def fake_cut(vp, segs, tmpdir, progress_cb=None):
+        for f in cut_out: open(f, "w").close()
+        return cut_out
+    def fake_concat(files, out, tmpdir):
+        open(out, "w").close()
+
+    with patch("app.cut_segments_cpu", side_effect=fake_cut), \
+         patch("app.concat_files", side_effect=fake_concat):
+        with qtbot.waitSignal(worker.export_complete, timeout=5000) as blocker:
+            worker.start(); worker.wait()
+    assert blocker.args[0] == output
+
+def test_export_worker_cleans_up_on_error(qapp, qtbot, tmp_path):
+    from unittest.mock import patch
+    segs = [{"start": 0.0, "end": 1.0}]
+    output = str(tmp_path / "out.mp4")
+    open(output, "w").close()
+    worker = ExportWorker("input.mp4", segs, output, use_gpu=False)
+    with patch("app.cut_segments_cpu", side_effect=RuntimeError("ffmpeg failed")):
+        with qtbot.waitSignal(worker.error, timeout=5000):
+            worker.start(); worker.wait()
+    assert not os.path.exists(output)

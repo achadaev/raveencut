@@ -224,6 +224,35 @@ class AnalysisWorker(QThread):
         except Exception as exc:
             self.error.emit(str(exc))
 
+class ExportWorker(QThread):
+    progress        = pyqtSignal(int, str)
+    export_complete = pyqtSignal(str)
+    error           = pyqtSignal(str)
+
+    def __init__(self, video_path, segments, output_path, use_gpu, parent=None):
+        super().__init__(parent)
+        self.video_path  = video_path
+        self.segments    = segments
+        self.output_path = output_path
+        self.use_gpu     = use_gpu
+
+    def run(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            try:
+                def cb(done, total_segs):
+                    pct = int(done / total_segs * 90)
+                    self.progress.emit(pct, f"Cutting {done}/{total_segs}…")
+                cut_fn = cut_segments_gpu if self.use_gpu else cut_segments_cpu
+                seg_files = cut_fn(self.video_path, self.segments, tmpdir, cb)
+                self.progress.emit(91, "Concatenating…")
+                concat_files(seg_files, self.output_path, tmpdir)
+                self.progress.emit(100, "Done")
+                self.export_complete.emit(self.output_path)
+            except Exception as exc:
+                if os.path.exists(self.output_path):
+                    os.remove(self.output_path)
+                self.error.emit(str(exc))
+
 
 if __name__ == "__main__":
     import sys
