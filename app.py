@@ -1,9 +1,9 @@
 """RaveenCut — silence removal desktop app."""
 import json, os, shutil, subprocess, sys, tempfile, time
 
-import numpy as np
 import torch
 import torch.nn.functional as F
+import numpy as np
 from PyQt6.QtCore import QThread, QTimer, QUrl, pyqtSignal, Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
