@@ -120,3 +120,25 @@ def test_import_view_case_insensitive(qapp, qtbot):
     v = ImportView(); qtbot.addWidget(v); v.show()
     with qtbot.waitSignal(v.file_selected, timeout=1000):
         v._handle_path("video.MP4")
+
+from app import MainView
+
+def test_main_view_creates(qapp, qtbot):
+    v = MainView(); qtbot.addWidget(v); v.show()
+    assert v.isVisible()
+
+def test_main_view_two_step_restore(qapp, qtbot):
+    v = MainView(); qtbot.addWidget(v)
+    segs = [{"start": 0.0, "end": 5.0}]
+    pcm = np.zeros(100, dtype=np.float32)
+    v.load_analysis(segs, pcm, 10.0, [0.1]*200)
+    seeks = []
+    v._video_player.seek = lambda t: seeks.append(t)
+
+    chip = v._chips[0]
+    chip.click()                          # first click: seek
+    assert len(seeks) == 1
+    assert 0 not in v._restored_indices  # not yet restored
+
+    chip.click()                          # second click: restore
+    assert 0 in v._restored_indices
