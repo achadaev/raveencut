@@ -26,9 +26,36 @@ DEFAULT_PADDING     = 0.35
 WAVEFORM_BARS   = 2_000
 
 # Stubs — replaced in subsequent tasks
-def run(cmd): pass
-def probe_video_duration_sec(path): pass
-def read_audio_from_video(path, sampling_rate=SAMPLING_RATE): pass
+def run(cmd):
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"FFmpeg failed: {result.stderr}")
+    return result
+def probe_video_duration_sec(video_path):
+    if not shutil.which("ffprobe"):
+        return None
+    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+           "-of", "json", video_path]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return float(json.loads(result.stdout)["format"]["duration"])
+    except Exception:
+        return None
+def read_audio_from_video(video_path, sampling_rate=SAMPLING_RATE):
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("ffmpeg not found on PATH")
+    cmd = ["ffmpeg", "-i", video_path,
+           "-f", "f32le", "-ac", "1", "-ar", str(sampling_rate), "-"]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, bufsize=10**6)
+    raw = proc.stdout.read()
+    proc.wait()
+    if not raw:
+        raise RuntimeError(
+            "No audio data — file may have no audio track or be corrupt. "
+            "Try converting to MP4 first."
+        )
+    return torch.from_numpy(np.frombuffer(raw, dtype=np.float32).copy())
 def merge_segments(segments, min_gap=0.6):
     merged = []
     for seg in segments:

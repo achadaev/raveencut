@@ -14,6 +14,7 @@ import pytest
 from app import (
     merge_segments, pad_segments, probs_to_segments,
     silence_regions, export_segments_fn, fmt_time, resolve_output_path,
+    run, probe_video_duration_sec, read_audio_from_video,
 )
 
 def test_fmt_time_sub_hour():
@@ -105,3 +106,48 @@ def test_resolve_output_path_increments_twice(tmp_path):
     (tmp_path / "cut_video.mp4").touch()
     (tmp_path / "cut_video_1.mp4").touch()
     assert resolve_output_path(src) == str(tmp_path / "cut_video_2.mp4")
+
+from unittest.mock import patch
+import struct
+
+def test_run_raises_on_nonzero():
+    mock = MagicMock(); mock.returncode = 1; mock.stderr = "err"
+    with patch("subprocess.run", return_value=mock):
+        with pytest.raises(RuntimeError, match="FFmpeg failed"):
+            run(["ffmpeg"])
+
+def test_run_returns_result_on_success():
+    mock = MagicMock(); mock.returncode = 0
+    with patch("subprocess.run", return_value=mock):
+        assert run(["ffmpeg"]) is mock
+
+def test_probe_parses_json():
+    mock = MagicMock(); mock.stdout = '{"format":{"duration":"123.456"}}'
+    with patch("shutil.which", return_value="/usr/bin/ffprobe"), \
+         patch("subprocess.run", return_value=mock):
+        assert probe_video_duration_sec("x.mp4") == pytest.approx(123.456)
+
+def test_probe_returns_none_without_ffprobe():
+    with patch("shutil.which", return_value=None):
+        assert probe_video_duration_sec("x.mp4") is None
+
+def test_read_audio_returns_tensor():
+    import numpy as np
+    pcm = struct.pack("4f", 0.1, -0.1, 0.2, -0.2)
+    mock_proc = MagicMock()
+    mock_proc.stdout.read.return_value = pcm
+    mock_proc.wait.return_value = None
+
+    # Create a real tensor mock with shape and item methods
+    import sys
+    torch_mock = sys.modules['torch']
+    tensor_mock = MagicMock()
+    tensor_mock.shape = (4,)
+    tensor_mock.__getitem__ = lambda self, i: MagicMock(item=lambda: [0.1, -0.1, 0.2, -0.2][i])
+    torch_mock.from_numpy.return_value = tensor_mock
+
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.Popen", return_value=mock_proc):
+        t = read_audio_from_video("x.mp4")
+    assert t.shape == (4,)
+    assert abs(t[0].item() - 0.1) < 1e-5
