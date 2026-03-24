@@ -27,7 +27,10 @@ WAVEFORM_BARS   = 2_000
 
 # Stubs — replaced in subsequent tasks
 def run(cmd):
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError:
+        raise RuntimeError(f"'{cmd[0]}' not found on PATH. Please install ffmpeg.")
     if result.returncode != 0:
         raise RuntimeError(f"FFmpeg failed: {result.stderr}")
     return result
@@ -156,7 +159,8 @@ def concat_files(files, output_path, tmpdir):
     list_file = os.path.join(tmpdir, "concat.txt")
     with open(list_file, "w", encoding="utf-8") as f:
         for path in files:
-            f.write(f"file '{path}'\n")
+            escaped = path.replace("'", "'\\''")
+            f.write(f"file '{escaped}'\n")
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0",
          "-i", list_file, "-c", "copy", output_path])
 
