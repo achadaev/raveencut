@@ -920,6 +920,7 @@ class MainView(QWidget):
         self._export_label.setText("")
         self._export_progress.setVisible(True)
         self._export_cancel_btn.setVisible(True)
+        self._export_cancel_btn.setEnabled(True)
         self._back_btn.setEnabled(False)
         self._export_worker.start()
 
