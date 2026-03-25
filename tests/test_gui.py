@@ -200,29 +200,38 @@ def test_export_worker_cancel_does_not_emit_error(qapp, qtbot, tmp_path):
     assert errors == []
 
 def test_analysis_worker_emits_cancelled(qapp, qtbot):
+    from unittest.mock import MagicMock
     wav = torch.zeros(SAMPLING_RATE)
     worker = AnalysisWorker("fake.mp4")
     worker.request_cancel()  # cancel before probs loop
 
-    with patch.object(worker, "_extract_audio", return_value=(wav, 1.0)):
+    mock_model = MagicMock()
+    mock_model.return_value.item.return_value = 0.0
+    with patch.object(worker, "_extract_audio", return_value=(wav, 1.0)), \
+         patch("app.load_silero_vad", return_value=mock_model):
         with qtbot.waitSignal(worker.cancelled, timeout=5000):
             worker.start()
             worker.wait()
 
 def test_analysis_worker_cancel_does_not_emit_complete(qapp, qtbot):
+    from unittest.mock import MagicMock
     wav = torch.zeros(SAMPLING_RATE)
     worker = AnalysisWorker("fake.mp4")
     worker.request_cancel()
     completed = []
     worker.analysis_complete.connect(lambda s, p, d: completed.append(True))
 
-    with patch.object(worker, "_extract_audio", return_value=(wav, 1.0)):
+    mock_model = MagicMock()
+    mock_model.return_value.item.return_value = 0.0
+    with patch.object(worker, "_extract_audio", return_value=(wav, 1.0)), \
+         patch("app.load_silero_vad", return_value=mock_model):
         with qtbot.waitSignal(worker.cancelled, timeout=5000):
             worker.start()
             worker.wait()
     assert completed == []
 
 def test_analysis_worker_cancel_preserves_cached_probs(qapp, qtbot):
+    from unittest.mock import MagicMock
     wav = torch.zeros(SAMPLING_RATE)
     n_frames = (SAMPLING_RATE + FRAME_SIZE - 1) // FRAME_SIZE
     prior_probs = [0.5] * n_frames
@@ -230,7 +239,10 @@ def test_analysis_worker_cancel_preserves_cached_probs(qapp, qtbot):
     worker.cached_probs = prior_probs  # simulate a prior successful run
     worker.request_cancel()
 
-    with patch.object(worker, "_extract_audio", return_value=(wav, 1.0)):
+    mock_model = MagicMock()
+    mock_model.return_value.item.return_value = 0.0
+    with patch.object(worker, "_extract_audio", return_value=(wav, 1.0)), \
+         patch("app.load_silero_vad", return_value=mock_model):
         with qtbot.waitSignal(worker.cancelled, timeout=5000):
             worker.start()
             worker.wait()
