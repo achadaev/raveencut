@@ -265,6 +265,53 @@ def test_main_view_export_cancelled_resets_ui(qapp, qtbot):
     assert v._export_label.text() == ""
     assert v._back_btn.isEnabled()
 
+def test_main_view_analysis_cancel_btn_hidden_by_default(qapp, qtbot):
+    v = MainView()
+    qtbot.addWidget(v)
+    assert not v._analysis_cancel_btn.isVisible()
+
+def test_main_view_reset_after_analysis_cancel_restores_ui(qapp, qtbot):
+    from unittest.mock import MagicMock
+    v = MainView()
+    qtbot.addWidget(v)
+    segs = [{"start": 0.0, "end": 5.0}]
+    pcm = np.zeros(100, dtype=np.float32)
+    v.load_analysis(segs, pcm, 10.0, [0.5] * 200)
+
+    # Simulate UI entering analysis-running state
+    v._analysis_worker = MagicMock()
+    v._waveform_stack.setCurrentIndex(1)
+    for sl in (v._thr_slider, v._sil_slider, v._pad_slider):
+        sl.setEnabled(False)
+    v._analysis_cancel_btn.setVisible(True)
+
+    v._reset_after_analysis_cancel()
+
+    assert v._analysis_worker is None
+    assert v._waveform_stack.currentIndex() == 0
+    assert v._thr_slider.isEnabled()
+    assert v._sil_slider.isEnabled()
+    assert v._pad_slider.isEnabled()
+    assert v._export_btn.isEnabled()   # prior analysis data exists
+    assert not v._analysis_cancel_btn.isVisible()
+
+def test_main_view_reset_after_analysis_cancel_idempotent(qapp, qtbot):
+    v = MainView()
+    qtbot.addWidget(v)
+    v._analysis_worker = None
+    # Must not raise when called twice
+    v._reset_after_analysis_cancel()
+    v._reset_after_analysis_cancel()
+
+def test_main_view_reset_after_analysis_cancel_no_prior_data(qapp, qtbot):
+    from unittest.mock import MagicMock
+    v = MainView()
+    qtbot.addWidget(v)
+    # No prior analysis: _cached_probs is still []
+    v._analysis_worker = MagicMock()
+    v._reset_after_analysis_cancel()
+    assert not v._export_btn.isEnabled()
+
 from app import MainWindow, ImportView
 
 def test_main_window_shows_import_on_start(qapp, qtbot):

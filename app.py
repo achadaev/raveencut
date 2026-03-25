@@ -696,10 +696,14 @@ class MainView(QWidget):
         self._progress_bar.setRange(0, 100)
         self._status_label = QLabel("")
         self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._analysis_cancel_btn = QPushButton(_("Cancel"))
+        self._analysis_cancel_btn.setVisible(False)
+        self._analysis_cancel_btn.clicked.connect(self._on_analysis_cancel_clicked)
         progress_layout = QVBoxLayout()
         progress_layout.addStretch()
         progress_layout.addWidget(self._status_label)
         progress_layout.addWidget(self._progress_bar)
+        progress_layout.addWidget(self._analysis_cancel_btn, alignment=Qt.AlignmentFlag.AlignCenter)
         progress_layout.addStretch()
         progress_page = QWidget()
         progress_page.setLayout(progress_layout)
@@ -765,6 +769,8 @@ class MainView(QWidget):
         self._title_label.setText(os.path.basename(path))
         self._video_player.load(path)
         self._waveform_stack.setCurrentIndex(1)
+        self._analysis_cancel_btn.setEnabled(True)
+        self._analysis_cancel_btn.setVisible(True)
         self._export_btn.setEnabled(False)
         for sl in (self._thr_slider, self._sil_slider, self._pad_slider):
             sl.setEnabled(False)
@@ -772,6 +778,7 @@ class MainView(QWidget):
         self._analysis_worker.progress.connect(self._on_analysis_progress)
         self._analysis_worker.analysis_complete.connect(self._on_analysis_complete)
         self._analysis_worker.error.connect(self._on_analysis_error)
+        self._analysis_worker.cancelled.connect(self._reset_after_analysis_cancel)
         self._analysis_worker.start()
 
     def load_analysis(self, speech_segs, pcm, duration, cached_probs):
@@ -796,16 +803,50 @@ class MainView(QWidget):
         self._status_label.setText(msg)
 
     def _on_analysis_complete(self, segs, pcm, duration):
+        self._analysis_cancel_btn.setVisible(False)
         worker = self._analysis_worker
         self._analysis_worker = None
         cached_probs = worker.cached_probs if worker else []
         self.load_analysis(segs, pcm, duration, cached_probs)
 
     def _on_analysis_error(self, msg):
+        self._analysis_cancel_btn.setVisible(False)
         self._analysis_worker = None
         self._waveform_stack.setCurrentIndex(0)
         self._warning_label.setText(_("Analysis failed: ") + msg)
         self._warning_label.setVisible(True)
+
+    def _on_analysis_cancel_clicked(self):
+        reply = QMessageBox.question(
+            self,
+            _("Cancel analysis"),
+            _("Cancel analysis?"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        if self._analysis_worker is None or not self._analysis_worker.isRunning():
+            return
+        self._analysis_cancel_btn.setEnabled(False)
+        self._analysis_worker.request_cancel()
+        self._analysis_worker.wait(300)
+        if self._analysis_worker is not None and self._analysis_worker.isRunning():
+            self._analysis_worker.terminate()
+            self._analysis_worker.wait()
+        self._reset_after_analysis_cancel()
+
+    def _reset_after_analysis_cancel(self):
+        if self._analysis_worker is None:
+            return  # idempotent guard
+        self._analysis_worker = None
+        self._progress_bar.setValue(0)
+        self._status_label.setText("")
+        self._waveform_stack.setCurrentIndex(0)
+        for sl in (self._thr_slider, self._sil_slider, self._pad_slider):
+            sl.setEnabled(True)
+        if self._cached_probs is not None and len(self._cached_probs) > 0:
+            self._export_btn.setEnabled(True)
+        self._analysis_cancel_btn.setVisible(False)
 
     def _on_slider_released(self):
         if self._analysis_worker is not None:
