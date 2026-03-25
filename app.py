@@ -227,7 +227,7 @@ def concat_files(files, output_path, tmpdir):
          "-i", list_file, "-c", "copy", output_path])
 
 class _CancelledError(Exception):
-    """Raised inside ExportWorker.run() to abort export cooperatively."""
+    """Raised inside worker run() methods to abort cooperatively."""
 
 
 class AnalysisWorker(QThread):
