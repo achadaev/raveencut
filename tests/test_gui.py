@@ -10,8 +10,14 @@ from PyQt6.QtWidgets import QApplication
 def qapp():
     return QApplication.instance() or QApplication(sys.argv)
 
-from app import (AnalysisWorker, SAMPLING_RATE, FRAME_SIZE,
-                 DEFAULT_THRESHOLD, DEFAULT_MIN_SILENCE, DEFAULT_PADDING)
+from ui.workers import AnalysisWorker
+from core.constants import (SAMPLING_RATE, FRAME_SIZE,
+                             DEFAULT_THRESHOLD, DEFAULT_MIN_SILENCE, DEFAULT_PADDING)
+
+from ui.waveform import WaveformWidget
+from ui.video_player import VideoPlayerWidget
+from ui.import_view import ImportView
+from ui.main_window import MainView, MainWindow
 
 def test_analysis_worker_emits_complete(qapp, qtbot):
     wav = torch.zeros(SAMPLING_RATE)
@@ -39,7 +45,7 @@ def test_analysis_worker_emits_error_on_bad_file(qapp, qtbot):
         worker.wait()
     assert len(blocker.args[0]) > 0
 
-from app import ExportWorker
+from ui.workers import ExportWorker
 
 def test_export_worker_emits_complete(qapp, qtbot, tmp_path):
     from unittest.mock import patch
@@ -54,8 +60,8 @@ def test_export_worker_emits_complete(qapp, qtbot, tmp_path):
     def fake_concat(files, out, tmpdir):
         open(out, "w").close()
 
-    with patch("app.cut_segments_cpu", side_effect=fake_cut), \
-         patch("app.concat_files", side_effect=fake_concat):
+    with patch("ui.workers.cut_segments_cpu", side_effect=fake_cut), \
+         patch("ui.workers.concat_files", side_effect=fake_concat):
         with qtbot.waitSignal(worker.export_complete, timeout=5000) as blocker:
             worker.start(); worker.wait()
     assert blocker.args[0] == output
@@ -66,12 +72,10 @@ def test_export_worker_cleans_up_on_error(qapp, qtbot, tmp_path):
     output = str(tmp_path / "out.mp4")
     open(output, "w").close()
     worker = ExportWorker("input.mp4", segs, output, use_gpu=False)
-    with patch("app.cut_segments_cpu", side_effect=RuntimeError("ffmpeg failed")):
+    with patch("ui.workers.cut_segments_cpu", side_effect=RuntimeError("ffmpeg failed")):
         with qtbot.waitSignal(worker.error, timeout=5000):
             worker.start(); worker.wait()
     assert not os.path.exists(output)
-
-from app import WaveformWidget
 
 def test_waveform_widget_creates(qapp, qtbot):
     w = WaveformWidget()
@@ -90,15 +94,11 @@ def test_waveform_seek_signal(qapp, qtbot):
         QTest.mouseClick(w, Qt.MouseButton.LeftButton, pos=QPoint(400, 40))
     assert 0.0 <= blocker.args[0] <= 10.0
 
-from app import VideoPlayerWidget
-
 def test_video_player_widget_creates(qapp, qtbot):
     w = VideoPlayerWidget()
     qtbot.addWidget(w); w.show()
     assert w._play_btn is not None
     assert w._time_label is not None
-
-from app import ImportView
 
 def test_import_view_creates(qapp, qtbot):
     v = ImportView(); qtbot.addWidget(v); v.show()
@@ -122,8 +122,6 @@ def test_import_view_case_insensitive(qapp, qtbot):
     with qtbot.waitSignal(v.file_selected, timeout=1000):
         v._handle_path("video.MP4")
 
-from app import MainView
-
 def test_main_view_creates(qapp, qtbot):
     v = MainView(); qtbot.addWidget(v); v.show()
     assert v.isVisible()
@@ -143,8 +141,6 @@ def test_main_view_two_step_restore(qapp, qtbot):
 
     chip.click()                          # second click: restore
     assert 0 in v._restored_indices
-
-from app import MainWindow, ImportView
 
 def test_main_window_shows_import_on_start(qapp, qtbot):
     w = MainWindow(); qtbot.addWidget(w); w.show()

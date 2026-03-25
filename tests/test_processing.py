@@ -11,11 +11,12 @@ sys.modules['torch.nn.functional'] = MagicMock()
 sys.modules['silero_vad'] = MagicMock()
 
 import pytest
-from app import (
+from core.segments import (
     merge_segments, pad_segments, probs_to_segments,
-    silence_regions, export_segments_fn, fmt_time, resolve_output_path,
-    run, probe_video_duration_sec, read_audio_from_video,
+    silence_regions, export_segments_fn,
 )
+from core.utils import fmt_time, resolve_output_path, run
+from core.audio import probe_video_duration_sec, read_audio_from_video
 
 def test_fmt_time_sub_hour():
     assert fmt_time(75.0) == "1:15"
@@ -152,7 +153,7 @@ def test_read_audio_returns_tensor():
     assert t.shape == (4,)
     assert abs(t[0].item() - 0.1) < 1e-5
 
-from app import nvenc_available, cut_segments_gpu, cut_segments_cpu, concat_files
+from core.exporter import nvenc_available, cut_segments_gpu, cut_segments_cpu, concat_files
 
 def test_nvenc_available_true():
     mock = MagicMock(); mock.stdout = "h264_nvenc encoder"

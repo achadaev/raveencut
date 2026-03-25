@@ -7,7 +7,7 @@ import pytest
 
 
 def test_set_language_ru_translates_sample_strings():
-    from app import set_language
+    from core.i18n import set_language
 
     set_language("ru")
     assert _("Export") == "Экспорт"
@@ -16,7 +16,7 @@ def test_set_language_ru_translates_sample_strings():
 
 
 def test_set_language_en_returns_msgid():
-    from app import set_language
+    from core.i18n import set_language
 
     set_language("en")
     assert _("Export") == "Export"
@@ -24,7 +24,7 @@ def test_set_language_en_returns_msgid():
 
 
 def test_set_language_ru_format_strings():
-    from app import set_language
+    from core.i18n import set_language
 
     set_language("ru")
     assert _("Threshold: {v:.2f}").format(v=0.5) == "Порог: 0.50"
@@ -32,7 +32,7 @@ def test_set_language_ru_format_strings():
 
 
 def test_unknown_key_returns_itself():
-    from app import set_language
+    from core.i18n import set_language
 
     set_language("ru")
     assert _("__unknown_key__") == "__unknown_key__"
