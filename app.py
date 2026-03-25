@@ -813,6 +813,8 @@ class MainView(QWidget):
         self._analysis_cancel_btn.setVisible(False)
         self._analysis_worker = None
         self._waveform_stack.setCurrentIndex(0)
+        for sl in (self._thr_slider, self._sil_slider, self._pad_slider):
+            sl.setEnabled(True)
         self._warning_label.setText(_("Analysis failed: ") + msg)
         self._warning_label.setVisible(True)
 
